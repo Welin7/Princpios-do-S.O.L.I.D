@@ -160,32 +160,376 @@ namespace SOLID.SRP.Solucao
 - O princípio aberto-fechado traz a ideia de que as classes da aplicação devem ser abertas para extensões e fechadas para modificações, ou seja, outras classes podem ter acesso ao que aquela classe possui, porém, não podem alterá-las.
 - Isso porque alterar uma classe pai pode ser perigoso, já que outras classes dentro da aplicação podem estar utilizando-a. Ao realizar uma alteração nela, impactará todas as outras que estão utilizando ela.
 - Talvez você esteja pensando: “e se a minha classe precisar executar uma outra tarefa?” Você pode simplesmente criar uma nova tarefa dentro da classe. A ideia aqui não é não mexer na classe em hipótese alguma, e sim, caso necessário, adicionar uma nova função àquela classe e não alterar o que já existe nela.
+- Exemplo violando o princípio OCP — Open-Closed Principle:
+
+Veja o exemplo de violação na classe DebitoConta, que contém o método responsável por realizar as debitos das contas de Conta Corrente e Conta Poupança através de um Enum chamado “TipoConta”. Como podemos ver no código abaixo, o problema dessa implementação está na complexidade. Quanto mais regras forem sendo criadas, mais cases vão existir e a manutenção dessa classe vai ficar inviável. Além disso, o acoplamento da classe DebitoConta vai aumentar, porque vai cada vez mais depender de mais classes.
+```
+namespace SOLID.OCP.Violacao
+{
+    public class DebitoConta
+    {
+        public void Debitar(decimal valor, string conta, TipoConta tipoConta)
+        {
+            if (tipoConta == TipoConta.Corrente)
+            {
+                // Debita Conta Corrente
+            }
+
+            if (tipoConta == TipoConta.Poupanca)
+            {
+                // Valida Aniversário da Conta
+                // Debita Conta Poupança
+            }
+        }
+    }
+}
+```
+- Exemplo resolvendo a violação do princípio OCP — Open-Closed Principle:
+
+Primeiramente colocaremos a classe DebitoConta com o tipo abstrato e tendo as propriedades (NumeroTransacao, Debitar, FormatarTransacao). De acordo com o código abaixo:
+
+```
+using System;
+using System.Linq;
+
+namespace SOLID.OCP.Solucao
+{
+    public abstract class DebitoConta
+    {
+        public string NumeroTransacao { get; set; }
+        public abstract string Debitar(decimal valor, string conta);
+
+        public string FormatarTransacao()
+        {
+            const string chars = "ABCasDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            NumeroTransacao = new string(Enumerable.Repeat(chars, 15)
+              .Select(s => s[random.Next(s.Length)]).ToArray());
+
+            // Numero de transacao formatado
+            return NumeroTransacao;
+        } 
+    }
+}
+````
+Criaremos classes como DebitoContaCorrente e DebitoPoupança que irão herdar as características da classe pai que será DebitoConta. De acordo com código abaixo:
+```
+namespace SOLID.OCP.Solucao
+{
+    public class DebitoContaCorrente : DebitoConta
+    {
+        public override string Debitar(decimal valor, string conta)
+        {
+            // Debita Conta Corrente
+            return FormatarTransacao();
+        }
+    }
+}
+
+namespace SOLID.OCP.Solucao
+{
+    public class DebitoContaPoupanca : DebitoConta
+    {
+        public override string Debitar(decimal valor, string conta)
+        {
+            // Valida Aniversário da Conta
+            // Debita Conta Corrente
+            return FormatarTransacao();
+        }
+    }
+}
+```
+Com isso, conseguimos enxugar a classe DebitoConta e fazer com que ela não precise conhecer o comportamento das diversas contas. Ou seja, vamos fechar as classes DebitoContaCorrente e DebitoPoupança para mudanças e caso outras regras surjam para serem utilizadas na classe DebitoConta.
+Open-Closed Principle também é base para o padrão de projeto Strategy, estamos obedecendo o OCP.
+
+## L – Liskov Substitution Principle (Princípio da substituição de Liskov)
+
+- As classes derivadas devem ser substituíveis pelas suas classes bases.
+- Suponhamos que você tenha uma classe Pessoa. Essa classe contém atributos como nome, CPF, RG… Mas, e se você criar uma outra classe chamada Aluno, quais os atributos que a classe Aluno pode conter? Se você pensou em nome, CPF, RG, você está certíssimo, porém, não é interessante criar esses mesmos atributos para a classe aluno, o ideal seria que Aluno herdasse de Pessoa.
+- Esse é o princípio que traz a ideia de herança. Temos uma classe pai, que geralmente possui atributos genéricos e temos uma classe filha, que herda os atributos da classe pai e pode ter outros atributos específicos para si mesma. No nosso exemplo, a classe Aluno poderia herdar todos os atributos da classe Pessoa e ter também outros atributos como nota, presença.
+- Exemplo violando o princípio L – Liskov Substitution Principle:
+- Sobrescrever/implementar um método que não faz nada;
+- Lançar uma exceção inesperada;
+- Retornar valores de tipos diferentes da classe base.
+
+Segue o código abaixo:
+```
+namespace SOLID.LSP.Violacao
+{
+    public class Retangulo
+    {
+        public virtual double Altura { get; set; }
+        public virtual double Largura { get; set; }
+        public double Area { get { return Altura * Largura; } }
+    }
+}
+
+namespace SOLID.LSP.Violacao
+{
+    public class Quadrado : Retangulo
+    {
+        public override double Altura
+        {
+            set { base.Altura = base.Largura = value; }
+        }
+
+        public override double Largura
+        {
+            set { base.Altura = base.Largura = value; }
+        }
+    }
+}
+
+using System;
+
+namespace SOLID.LSP.Violacao
+{
+    public class CalculoArea
+    {
+        private static void ObterAreaRetangulo(Retangulo ret)
+        {
+            Console.Clear();
+            Console.WriteLine("Calculo da área do Retangulo");
+            Console.WriteLine();
+            Console.WriteLine(ret.Altura + " * " + ret.Largura);
+            Console.WriteLine();
+            Console.WriteLine(ret.Area);
+            Console.ReadKey();
+        }
+
+        public static void Calcular()
+        {
+            var quad = new Quadrado()
+            {
+                Altura = 10,
+                Largura = 5
+            };
+
+            ObterAreaRetangulo(quad);
+        }
+    }
+}
+```
+- Resolvendo a violação do princípio L – Liskov Substitution Principle:
+
+```
+namespace SOLID.LSP.Solucao
+{
+    public class Retangulo : Paralelogramo
+    {
+        public Retangulo(int altura, int largura)
+            :base(altura,largura)
+        {
+
+        }
+    }
+}
+
+using System;
+
+namespace SOLID.LSP.Solucao
+{
+    public class Quadrado : Paralelogramo
+    {
+        public Quadrado(int altura, int largura)
+            : base(altura, largura)
+        {
+            if(largura != altura)
+                throw new ArgumentException("Os dois lados do quadrado precisam ser iguais");
+        }
+    }
+}
+
+namespace SOLID.LSP.Solucao
+{
+    public abstract class Paralelogramo
+    {
+        protected Paralelogramo(int altura, int largura)
+        {
+            Altura = altura;
+            Largura = largura;
+        }
+
+        public double Altura { get; private set; }
+        public double Largura { get; private set ; }
+        public double Area { get { return Altura * Largura; } } 
+    }
+}
+
+using System;
+
+namespace SOLID.LSP.Solucao
+{
+    public class CalculoArea
+    {
+        private static void ObterAreaParalelogramo(Paralelogramo ret)
+        {
+            Console.Clear();
+            Console.WriteLine("Calculo da área do Retangulo");
+            Console.WriteLine();
+            Console.WriteLine(ret.Altura + " * " + ret.Largura);
+            Console.WriteLine();
+            Console.WriteLine(ret.Area);
+            Console.ReadKey();
+        }
+
+        public static void Calcular()
+        {
+            var quad = new Quadrado(5,5);
+            var ret = new Retangulo(10, 5);
+
+            ObterAreaParalelogramo(quad);
+            ObterAreaParalelogramo(ret);
+        }
+    }
+}
+```
+Para não violar o Liskov Substitution Principle, além de estruturar muito bem as suas abstrações, em alguns casos, você precisara usar a injeção de dependência e também usar outros princípios do SOLID. O princípio de Liskov Substitution Principle nos permite usar o polimorfismo com mais confiança. Podemos chamar nossas classes derivadas referindo-se à sua classe base sem preocupações com resultados inesperados.
+
+## I – Interface Segregation Principle (Princípio da Segregação da Interface)
+
+- Classes não devem ser forçadas a depender de métodos que não usam. 
+- Quando você aplica o princípio de herança, fazendo uma classe herdar da outra, sua classe filha é obrigada a implementar os métodos da classe pai e como você já deve estar imaginando, isso vai contra os princípios do SOLID, pois não é nada interessante que uma classe implementa métodos que não é útil para ela. 
+- Com o princípio de segregação de interface, é possível implementar somente o que importa para as nossas classes. Interfaces que possuem muitos comportamentos são difíceis de manter e evoluir, e devem ser evitadas.
+- Exemplo violando o princípio ISP — Interface Segregation Principle:
+
+Em um cenário fictício para criação de programa de e commerce, verificamos que as classes CadastroProduto e CadastroCliente herdam a mesma interface que possui mesmos métodos, porém metódo EnviarEmail() não corresponde para a classe CadastroProduto, pois produto não tem e-mail. Dessa forma, estamos violando o Interface Segregation Principle e o LSP também.
+Segue o código abaixo:
+```
+namespace SOLID.ISP.Violacao
+{
+    public interface ICadastro
+    {
+        void ValidarDados();
+        void SalvarBanco();
+        void EnviarEmail();
+    }
+}
+
+using System;
+
+namespace SOLID.ISP.Violacao
+{
+    public class CadastroProduto : ICadastro
+    {
+        public void ValidarDados()
+        {
+            // Validar valor
+        }
+
+        public void SalvarBanco()
+        {
+            // Insert tabela Produto
+        }
+
+        public void EnviarEmail()
+        {
+            // Produto não tem e-mail, o que eu faço agora???
+            throw new NotImplementedException("Esse metodo não serve pra nada");
+        }
+    }
+}
+
+namespace SOLID.ISP.Violacao
+{
+    public class CadastroCliente : ICadastro
+    {
+        public void ValidarDados()
+        {
+            // Validar CPF, Email
+        }
+
+        public void SalvarBanco()
+        {
+            // Insert na tabela Cliente
+        }
+
+        public void EnviarEmail()
+        {
+            // Enviar e-mail para o cliente
+        }
+    }
+}
+```
+- Resolvendo a violação do princípio ISP — Interface Segregation Principle:
+
+Resolveremos esse problema criando as interfaces mais específicas, segue o código abaixo:
+```
+using SOLID.ISP.Solucao.Interfaces;
+
+namespace SOLID.ISP.Solucao
+{
+    public class CadastroProduto : ICadastroProduto
+    {
+        public void ValidarDados()
+        {
+            // Validar valor
+        }
+
+        public void SalvarBanco()
+        {
+            // Insert tabela Produto
+        }
+    }
+}
+
+using SOLID.ISP.Solucao.Interfaces;
+
+namespace SOLID.ISP.Solucao
+{
+    public class CadastroCliente : ICadastroCliente
+    {
+        public void ValidarDados()
+        {
+            // Validar CPF, Email
+        }
+
+        public void SalvarBanco()
+        {
+            // Insert na tabela Cliente
+        }
+
+        public void EnviarEmail()
+        {
+            // Enviar e-mail para o cliente
+        }
+    }
+}
+
+namespace SOLID.ISP.Solucao.Interfaces
+{
+    public interface ICadastroProduto : ICadastro
+    {
+        void ValidarDados();
+    }
+}
+
+namespace SOLID.ISP.Solucao.Interfaces
+{
+    public interface ICadastroCliente : ICadastro
+    {
+        void ValidarDados();
+        void EnviarEmail();
+    }
+}
+
+namespace SOLID.ISP.Solucao.Interfaces
+{
+    public interface ICadastro
+    {
+        void SalvarBanco();
+    }
+}
+```
+## D – Dependency Inversion Principle (Princípio da inversão da dependência)
+
+- O princípio da inversão de dependência traz a ideia de que: 
+- Módulos de alto nível não devem depender de módulos de baixo nível. Ambos devem depender da abstração.
+- Abstrações não devem depender de detalhes. Os detalhes devem depender das abstrações. E isso se dá porque abstrações mudam menos e facilitam a mudança de comportamento e as futuras evoluções do código.
+- Em outras palavras, os módulos que são classes de alto nível devem depender de conceitos, também chamadas de abstrações independente de como funcionam, ou seja, a função da inversão de dependência faz com que os softwares se desassociem dos módulos. 
 
 
-## Parte 3
-
-- Visão geral sobre ORMs
-- [Material de apoio](material_apoio/material_apoio_parte_3.md)
-- CRUD com EF (Cadastro diretores e filmes)
-- Linq (To SQL)
-
-## Parte 4
-
-- Repository Pattern 
-- AutoMapper, DTOs 
-- Dependence Injection 
-- Fluent Validator 
-- JWT
-- Debbugar VSCode
-
-## Parte 5
-
-- Visão geral sobre arquitetura 
-- Monolithic vs Microservices
-- N-Tier
-- Multi-Tenancy
-
-## Parte 6
+## Os princípios SOLID devem ser aplicados para se obter os benefícios da orientação a objetos, tais como:
 
 - Clean Code
 - DDD
