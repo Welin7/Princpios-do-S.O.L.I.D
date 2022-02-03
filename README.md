@@ -527,12 +527,335 @@ namespace SOLID.ISP.Solucao.Interfaces
 - Módulos de alto nível não devem depender de módulos de baixo nível. Ambos devem depender da abstração.
 - Abstrações não devem depender de detalhes. Os detalhes devem depender das abstrações. E isso se dá porque abstrações mudam menos e facilitam a mudança de comportamento e as futuras evoluções do código.
 - Em outras palavras, os módulos que são classes de alto nível devem depender de conceitos, também chamadas de abstrações independente de como funcionam, ou seja, a função da inversão de dependência faz com que os softwares se desassociem dos módulos. 
+- Exemplo violando o princípio DIP — Dependency Inversion Principle:
 
+Estamos a violar esse princípio DIP, pois nosso repositório está realizando uma conexão na base de dados dentro do método AdicionarCliente(). De acordo com código abaixo:
+```
+using System;
 
+namespace SOLID.DIP.Violacao
+{
+    public class Cliente
+    {
+        public int ClienteId { get; set; }
+        public string Nome { get; set; }
+        public Email Email { get; set; }
+        public Cpf Cpf { get; set; }
+        public DateTime DataCadastro { get; set; }
+
+        public bool Validar()
+        {
+            return Email.Validar() && Cpf.Validar();
+        }
+    }
+}
+
+using System.Data;
+using System.Data.SqlClient;
+
+namespace SOLID.DIP.Violacao
+{
+    public class ClienteRepository
+    {
+
+        public void AdicionarCliente(Cliente cliente)
+        {
+            using (var cn = new SqlConnection())
+            {
+                var cmd = new SqlCommand();
+
+                cn.ConnectionString = "MinhaConnectionString";
+                cmd.Connection = cn;
+                cmd.CommandType = CommandType.Text;
+                cmd.CommandText = "INSERT INTO CLIENTE (NOME, EMAIL CPF, DATACADASTRO) VALUES (@nome, @email, @cpf, @dataCad))";
+
+                cmd.Parameters.AddWithValue("nome", cliente.Nome);
+                cmd.Parameters.AddWithValue("email", cliente.Email);
+                cmd.Parameters.AddWithValue("cpf", cliente.Cpf);
+                cmd.Parameters.AddWithValue("dataCad", cliente.DataCadastro);
+
+                cn.Open();
+                cmd.ExecuteNonQuery();
+            }
+        }
+    }
+}
+
+namespace SOLID.DIP.Violacao
+{
+    public class ClienteService
+    {
+        public string AdicionarCliente(Cliente cliente)
+        {
+            if (!cliente.Validar())
+                return "Dados inválidos";
+
+            var repo = new ClienteRepository();
+            repo.AdicionarCliente(cliente);
+
+            EmailServices.Enviar("empresa@empresa.com", cliente.Email.Endereco, "Bem Vindo", "Parabéns está Cadastrado");
+
+            return "Cliente cadastrado com sucesso";
+        }
+    }
+}
+
+namespace SOLID.DIP.Violacao
+{
+    public class Cpf
+    {
+        public string Numero { get; set; }
+
+        public bool Validar()
+        {
+            return Numero.Length == 11;
+        }
+    }
+}
+
+namespace SOLID.DIP.Violacao
+{
+    public class Email
+    {
+        public string Endereco { get; set; }
+
+        public bool Validar()
+        {
+            return Endereco.Contains("@");
+        }
+    }
+}
+
+using System.Net.Mail;
+
+namespace SOLID.DIP.Violacao
+{
+    public static class EmailServices
+    {
+        public static void Enviar(string de, string para, string assunto, string mensagem)
+        {
+            var mail = new MailMessage(de, para);
+            var client = new SmtpClient
+            {
+                Port = 25,
+                DeliveryMethod = SmtpDeliveryMethod.Network,
+                UseDefaultCredentials = false,
+                Host = "smtp.google.com"
+            };
+
+            mail.Subject = assunto;
+            mail.Body = mensagem;
+            client.Send(mail);
+        }
+    }
+}
+```
+- Resolvendo a violação do princípio DIP — Dependency Inversion Principle:
+
+Resolveremos esse problema criando as interfaces, mantendo um contrato com as classes e não dependendo das implementações, segue o código abaixo:
+
+```
+using System;
+using SOLID.DIP.Solucao.Interfaces;
+
+namespace SOLID.DIP.Solucao
+{
+    public class Cliente
+    {
+        public int ClienteId { get; set; }
+        public string Nome { get; set; }
+        public Email Email { get; set; }
+        public Cpf Cpf { get; set; }
+        public DateTime DataCadastro { get; set; }
+
+        public bool Validar()
+        {
+            return Email.Validar() && Cpf.Validar();
+        }
+    }
+}
+
+using System.Data;
+using System.Data.SqlClient;
+using SOLID.DIP.Solucao.Interfaces;
+
+namespace SOLID.DIP.Solucao
+{
+    public class ClienteRepository : IClienteRepository
+    {
+        public void AdicionarCliente(Cliente cliente)
+        {
+
+            using (var cn = new SqlConnection())
+            {
+                var cmd = new SqlCommand();
+
+                cn.ConnectionString = "MinhaConnectionString";
+                cmd.Connection = cn;
+                cmd.CommandType = CommandType.Text;
+                cmd.CommandText = "INSERT INTO CLIENTE (NOME, EMAIL CPF, DATACADASTRO) VALUES (@nome, @email, @cpf, @dataCad))";
+
+                cmd.Parameters.AddWithValue("nome", cliente.Nome);
+                cmd.Parameters.AddWithValue("email", cliente.Email);
+                cmd.Parameters.AddWithValue("cpf", cliente.Cpf);
+                cmd.Parameters.AddWithValue("dataCad", cliente.DataCadastro);
+
+                cn.Open();
+                cmd.ExecuteNonQuery();
+            }
+
+        }
+    }
+}
+
+using SOLID.DIP.Solucao.Interfaces;
+
+namespace SOLID.DIP.Solucao
+{
+    public class ClienteRepository2 : IClienteRepository
+    {
+        public void AdicionarCliente(Cliente cliente)
+        {
+
+            // Usar outra forma de ir até o BD
+
+        }
+    }
+}
+
+using SOLID.DIP.Solucao.Interfaces;
+
+namespace SOLID.DIP.Solucao
+{
+    public class ClienteServices : IClienteServices
+    {
+        private readonly IClienteRepository _clienteRepository;
+        private readonly IEmailServices _emailServices;
+
+        public ClienteServices(
+            IEmailServices emailServices, 
+            IClienteRepository clienteRepository)
+        {
+            _emailServices = emailServices;
+            _clienteRepository = clienteRepository;
+        }
+
+        public string AdicionarCliente(Cliente cliente)
+        {
+            if (!cliente.Validar())
+                return "Dados inválidos";
+
+            _clienteRepository.AdicionarCliente(cliente);
+
+            _emailServices.Enviar("empresa@empresa.com", cliente.Email.Endereco, "Bem Vindo", "Parabéns está Cadastrado");
+
+            return "Cliente cadastrado com sucesso";
+        }
+    }
+
+    public class TesteDip
+    {
+        public TesteDip()
+        {
+            var cliService = new ClienteServices(new EmailServices(), new ClienteRepository2());
+        }
+    }
+}
+
+namespace SOLID.DIP.Solucao
+{
+    public class Cpf
+    {
+        public string Numero { get; set; }
+
+        public bool Validar()
+        {
+            return Numero.Length == 11;
+        }
+    }
+}
+
+namespace SOLID.DIP.Solucao
+{
+    public class Email
+    {
+        public string Endereco { get; set; }
+
+        public bool Validar()
+        {
+            return Endereco.Contains("@");
+        }
+    }
+}
+
+using System.Net.Mail;
+using SOLID.DIP.Solucao.Interfaces;
+
+namespace SOLID.DIP.Solucao
+{
+    public class EmailServices : IEmailServices
+    {
+        public void Enviar(string de, string para, string assunto, string mensagem)
+        {
+            var mail = new MailMessage(de, para);
+            var client = new SmtpClient
+            {
+                Port = 25,
+                DeliveryMethod = SmtpDeliveryMethod.Network,
+                UseDefaultCredentials = false,
+                Host = "smtp.google.com"
+            };
+
+            mail.Subject = assunto;
+            mail.Body = mensagem;
+            client.Send(mail);
+        }
+    }
+}
+```
+**Interfaces**
+
+```
+namespace SOLID.DIP.Solucao.Interfaces
+{
+    public interface IClienteRepository
+    {
+        void AdicionarCliente(Cliente cliente);
+    }
+}
+
+namespace SOLID.DIP.Solucao.Interfaces
+{
+    public interface IClienteServices
+    {
+        string AdicionarCliente(Cliente cliente);
+    }
+}
+
+namespace SOLID.DIP.Solucao.Interfaces
+{
+    public interface IEmailServices
+    {
+        void Enviar(string de, string para, string assunto, string mensagem);
+    }
+}
+```
 ## Os princípios SOLID devem ser aplicados para se obter os benefícios da orientação a objetos, tais como:
 
-- Clean Code
-- DDD
-- SOLID
-- YAGNI, KISS, DRY
-- Gang of Four design patterns (Creational, Structural e Behavioral)
+- Seja fácil de se manter, adaptar e se ajustar às alterações de escopo;
+- Seja testável e de fácil entendimento;
+- Seja extensível para alterações com o menor esforço necessário;
+- Que forneça o máximo de reaproveitamento;
+
+## Utilizando os princípios SOLID é possível evitar problemas muito comuns:
+
+- Dificuldade na testabilidade / criação de testes de unidade;
+- Código macarrônico, sem estrutura ou padrão;
+- Dificuldades de isolar funcionalidades;
+- Duplicação de código, uma alteração precisa ser feita em N pontos;
+- Fragilidade, o código quebra facilmente em vários pontos após alguma mudança.
+
+## Conclusão:
+
+Aplicando os princípios do SOLID tornam o software mais robusto, escalável e flexível, deixando-o tolerante a mudanças, facilitando a implementação de novos requisitos para a evolução e manutenção do sistema.
+Na primeira vez pode ser um pouco assustador vendo como usar todos esses princípios, mas com a prática e constância, aos poucos vamos adquirindo a experiência necessária para escrever códigos cada vez mais maduros, os princípios SOLID servem como guias pra isso.
